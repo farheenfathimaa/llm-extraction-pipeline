@@ -1,0 +1,33 @@
+{
+  "api_settings": {
+    "default_model": "gpt-3.5-turbo",
+    "max_tokens": 4000,
+    "temperature": 0.1,
+    "timeout": 30
+  },
+  "processing_settings": {
+    "chunk_size": 4000,
+    "chunk_overlap": 200,
+    "max_document_size": 10000000,
+    "supported_formats": [
+      ".txt",
+      ".pdf",
+      ".docx",
+      ".md"
+    ]
+  },
+  "chain_settings": {
+    "max_retries": 3,
+    "retry_delay": 1,
+    "validation_threshold": 0.8
+  },
+  "output_settings": {
+    "save_intermediate_results": true,
+    "export_formats": [
+      "json",
+      "csv",
+      "markdown"
+    ],
+    "include_metadata": true
+  }
+}
