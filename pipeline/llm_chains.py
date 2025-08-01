@@ -3,7 +3,11 @@ import json
 from enum import Enum
 from langchain.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
 from langchain.output_parsers.json import SimpleJsonOutputParser
+
+# Import the new CacheManager
+from .cache_manager import CacheManager
 
 class ExtractionTask(Enum):
     """Enumeration for different extraction tasks with default prompts."""
@@ -32,19 +36,32 @@ class LLMChainManager:
 
     def _initialize_llm(self):
         """Initializes the LLM model from the configuration."""
-        # This will now use the model name from the UI, e.g., 'gpt-4o' or 'gpt-3.5-turbo'
-        return ChatOpenAI(
-            model_name=self.config.get("model_name", "gpt-4o"),
-            temperature=0,  # Use 0 for deterministic extraction
-            openai_api_key=self.config["openai_key"],
-        )
+        provider = self.config.get("provider", "OpenAI")
+        model_name = self.config.get("model_name", "gpt-4o")
+        
+        if provider == "OpenAI":
+            api_key = self.config["openai_key"]
+            return ChatOpenAI(
+                model_name=model_name,
+                temperature=0,  # Use 0 for deterministic extraction
+                openai_api_key=api_key,
+            )
+        elif provider == "Anthropic":
+            api_key = self.config["anthropic_key"]
+            return ChatAnthropic(
+                model_name=model_name,
+                temperature=0,
+                anthropic_api_key=api_key
+            )
+        else:
+            raise ValueError(f"Unsupported provider: {provider}")
+
 
     def get_extraction_chain(self, task: ExtractionTask, custom_prompt: str = None):
         """Constructs and returns a LangChain chain for a given task using LCEL."""
         if task == ExtractionTask.CUSTOM_EXTRACTION and not custom_prompt:
             raise ValueError("Custom prompt must be provided for CUSTOM_EXTRACTION task.")
 
-        # Create the prompt template
         prompt_str = task.value["prompt"]
         if task == ExtractionTask.CUSTOM_EXTRACTION:
             prompt_str = prompt_str.format(custom_prompt=custom_prompt)
@@ -59,10 +76,8 @@ class LLMChainManager:
         )
         extraction_prompt = PromptTemplate.from_template(final_prompt_template)
         
-        # We will use the JSON output parser to ensure structured output.
         output_parser = SimpleJsonOutputParser()
         
-        # This is the modern LangChain Expression Language (LCEL) syntax.
         return extraction_prompt | self.llm | output_parser
 
 class ExtractionPipeline:
@@ -74,6 +89,7 @@ class ExtractionPipeline:
     def __init__(self, config: dict):
         self.config = config
         self.chain_manager = LLMChainManager(config)
+        self.cache_manager = CacheManager()
 
     def extract_insights(
         self,
@@ -83,8 +99,14 @@ class ExtractionPipeline:
         confidence_threshold: float = 0.7,
     ) -> dict:
         """
-        Runs the extraction pipeline on a given text.
+        Runs the extraction pipeline on a given text, with caching.
         """
+        
+        # Check cache first
+        cached_result = self.cache_manager.get(text, extraction_type, custom_prompt)
+        if cached_result:
+            return cached_result
+            
         start_time = time.time()
         
         try:
@@ -99,23 +121,33 @@ class ExtractionPipeline:
         try:
             chain = self.chain_manager.get_extraction_chain(task, custom_prompt)
             
-            # Simple chunking strategy to prevent token limit issues
             if len(text) > 4000:
                 text = text[:4000] + "..."
             
-            # Use chain.invoke() as per the deprecation warning
             result = chain.invoke({"document": text})
             
-            end_time = time.time()
-            processing_time = end_time - start_time
+            # --- START: New Fallback Logic ---
+            # If the output is a string (not a valid JSON object), use it as the summary
+            if isinstance(result, str):
+                final_result = {
+                    "summary": result,
+                    "insights": [],
+                    "confidence": 1.0,
+                    "processing_time": time.time() - start_time
+                }
+            # --- END: New Fallback Logic ---
+            else:
+                final_result = {
+                    "summary": result.get("summary", "No summary found."),
+                    "insights": result.get("insights", []),
+                    "confidence": 1.0,
+                    "processing_time": time.time() - start_time
+                }
             
-            # The result is already a dictionary thanks to SimpleJsonOutputParser.
-            return {
-                "summary": result.get("summary", "No summary found."),
-                "insights": result.get("insights", []),
-                "confidence": 1.0,  # Placeholder, as LLMs don't directly return this
-                "processing_time": processing_time
-            }
+            # Cache the result before returning
+            self.cache_manager.set(text, extraction_type, custom_prompt, final_result)
+            
+            return final_result
         except Exception as e:
             end_time = time.time()
             processing_time = end_time - start_time

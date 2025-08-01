@@ -34,3 +34,13 @@ rouge-score==0.1.2
 # transformers==4.36.2
 # torch==2.1.2
 # accelerate==0.25.0
+
+streamlit
+python-dotenv
+langchain
+langchain-openai
+langchain-anthropic
+pypdf
+docx2txt
+pandas
+plotly

@@ -61,9 +61,12 @@ def _init_session():
 
 
 def _config_complete() -> bool:
-    # Check if the OpenAI key is set in the session state
-    if not st.session_state.get("config", {}).get("openai_key"):
+    # Check if the API key is set for the selected provider
+    if st.session_state.get("config", {}).get("provider") == "OpenAI" and not st.session_state.get("config", {}).get("openai_key"):
         st.error("🚨 Please provide your OpenAI key in the sidebar.")
+        return False
+    if st.session_state.get("config", {}).get("provider") == "Anthropic" and not st.session_state.get("config", {}).get("anthropic_key"):
+        st.error("🚨 Please provide your Anthropic key in the sidebar.")
         return False
     return True
 
@@ -75,31 +78,51 @@ def _config_complete() -> bool:
 def sidebar():
     st.sidebar.header("⚙️  Configuration")
 
-    # -- API keys ------------------------------------------------------------
-    # Get the key from the .env file first, or from the session state if it exists
-    openai_key_from_env = os.getenv("OPENAI_API_KEY", "")
-    openai_key = st.sidebar.text_input(
-        "OpenAI API Key",
-        value=st.session_state.get("config", {}).get("openai_key", openai_key_from_env),
-        type="password",
-    )
-
-    # -- Model provider ------------------------------------------------------
-    # Only offer models that are guaranteed to work or are common.
-    model_name = st.sidebar.selectbox(
-        "OpenAI Model",
-        ["gpt-4o", "gpt-3.5-turbo"], # Removed 'gpt-4' as it's often a source of the 'model not found' error
+    # -- Model provider selection --------------------------------------------
+    provider = st.sidebar.selectbox(
+        "Select LLM Provider",
+        ["OpenAI", "Anthropic"],
         index=0,
     )
 
-    # Update session state with the new config values
-    st.session_state["config"] = {
-        "openai_key": openai_key,
-        "model_name": model_name,
-    }
+    st.session_state["config"]["provider"] = provider
 
-    if openai_key:
-        st.sidebar.success("✅ Key stored in memory – not sent anywhere else.")
+    if provider == "OpenAI":
+        # -- OpenAI API keys & Model selection --------------------------------
+        openai_key_from_env = os.getenv("OPENAI_API_KEY", "")
+        openai_key = st.sidebar.text_input(
+            "OpenAI API Key",
+            value=st.session_state.get("config", {}).get("openai_key", openai_key_from_env),
+            type="password",
+        )
+        model_name = st.sidebar.selectbox(
+            "OpenAI Model",
+            ["gpt-4o", "gpt-3.5-turbo"],
+            index=0,
+        )
+        st.session_state["config"]["openai_key"] = openai_key
+        st.session_state["config"]["model_name"] = model_name
+        if openai_key:
+            st.sidebar.success("✅ OpenAI key stored in memory.")
+
+    elif provider == "Anthropic":
+        # -- Anthropic API keys & Model selection ------------------------------
+        anthropic_key_from_env = os.getenv("ANTHROPIC_API_KEY", "")
+        anthropic_key = st.sidebar.text_input(
+            "Anthropic API Key",
+            value=st.session_state.get("config", {}).get("anthropic_key", anthropic_key_from_env),
+            type="password",
+        )
+        model_name = st.sidebar.selectbox(
+            "Anthropic Model",
+            ["claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"],
+            index=1,
+        )
+        st.session_state["config"]["anthropic_key"] = anthropic_key
+        st.session_state["config"]["model_name"] = model_name
+        if anthropic_key:
+            st.sidebar.success("✅ Anthropic key stored in memory.")
+
 
 ###############################################################################
 # 📄 Tab 1 – Document processing
