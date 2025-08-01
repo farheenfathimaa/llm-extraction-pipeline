@@ -14,9 +14,10 @@ load_dotenv()
 from pipeline.document_processor import DocumentProcessor
 from pipeline.llm_chains import ExtractionPipeline
 from pipeline.evaluation import EvaluationMetrics as PipelineEvaluator
+# import anthropic.lib.exceptions as anthropic_exceptions # THIS LINE IS REMOVED
 
 ###############################################################################
-# 🔧 Page‑wide settings & Styles
+# 🔧 Page-wide settings & Styles
 ###############################################################################
 
 st.set_page_config(
@@ -72,11 +73,11 @@ def _config_complete() -> bool:
 
 
 ###############################################################################
-# 🖼  Sidebar – API keys & Model selection
+# 🖼  Sidebar – API keys & Model selection
 ###############################################################################
 
 def sidebar():
-    st.sidebar.header("⚙️  Configuration")
+    st.sidebar.header("⚙️  Configuration")
 
     # -- Model provider selection --------------------------------------------
     provider = st.sidebar.selectbox(
@@ -170,17 +171,22 @@ def tab_documents():
     # ---------------------------------------------------------------- results
     if st.session_state["extraction_results"]:
         st.subheader("Latest results")
+        # Display up to the last 5 results (or all if less than 5)
         for res in st.session_state["extraction_results"][-5:]:
             with st.expander(res["filename"], expanded=False):
-                st.write(res["extraction_result"].get("summary", "― no summary ―"))
-                if insights := res["extraction_result"].get("insights"):
-                    st.markdown("**Key insights**")
-                    for i in insights:
-                        st.write("•", i)
+                # Display error if present
+                if "error" in res["extraction_result"]:
+                    st.error(f"Error for {res['filename']}: {res['extraction_result']['summary']}")
+                else:
+                    st.write(res["extraction_result"].get("summary", "― no summary ―"))
+                    if insights := res["extraction_result"].get("insights"):
+                        st.markdown("**Key insights**")
+                        for i in insights:
+                            st.write("•", i)
                 st.caption(f"Processed {res['document_length']} chars in {res['processing_time']:.2f}s – {res['timestamp']}")
 
 ###############################################################################
-# 🏃‍♀️  Actual processing work
+# 🏃‍♀️  Actual processing work
 ###############################################################################
 
 
@@ -226,11 +232,16 @@ def _run_pipeline(files, extraction_type, custom_prompt, threshold):
                 {
                     "filename": f.name,
                     "timestamp": datetime.now().isoformat(),
-                    "extraction_result": {"summary": f"Error: {e}"},
+                    "extraction_result": {"summary": f"Error during document processing: {e}"},
                     "document_length": 0,
                     "processing_time": 0,
+                    "status": "error", # Add status for clarity
+                    "error_message": str(e)
                 }
             )
+            
+            # This 'continue' ensures one failing document doesn't stop the loop for others
+            continue 
         finally:
             tmp.unlink(missing_ok=True)
 
@@ -302,8 +313,15 @@ def tab_analytics():
         st.info("No data yet")
         return
     res = st.session_state["extraction_results"]
-    avg_time = sum(r["processing_time"] for r in res) / len(res)
-    st.metric("Average processing time", f"{avg_time:.2f}s")
+    # Filter out results with errors for meaningful analytics on processing time
+    successful_results = [r for r in res if r.get("status") != "error" and r.get("processing_time") is not None]
+
+    if successful_results:
+        avg_time = sum(r["processing_time"] for r in successful_results) / len(successful_results)
+        st.metric("Average processing time (successful extractions)", f"{avg_time:.2f}s")
+    else:
+        st.info("No successful extractions to display analytics for.")
+
 
 ###############################################################################
 # 🚀 Main

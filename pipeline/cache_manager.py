@@ -20,15 +20,18 @@ class CacheManager:
         if config:
             key_parts.append(config.get("provider", ""))
             key_parts.append(config.get("model_name", ""))
+            # Also include temperature if it affects output deterministically
+            key_parts.append(str(config.get("temperature", 0))) 
             
         # Use a hash to create a unique file name
         hasher = hashlib.sha256()
         hasher.update("".join(key_parts).encode('utf-8'))
         return hasher.hexdigest()
 
-    def get(self, text: str, extraction_type: str, custom_prompt: str = None) -> dict | None:
+    # Modified get and set methods to accept config
+    def get(self, text: str, extraction_type: str, custom_prompt: str = None, config: dict = None) -> dict | None:
         """Retrieves a cached result, or None if not found."""
-        key = self._generate_key(text, extraction_type, custom_prompt)
+        key = self._generate_key(text, extraction_type, custom_prompt, config)
         cache_file = self.cache_dir / f"{key}.json"
         
         if cache_file.exists():
@@ -40,9 +43,9 @@ class CacheManager:
                 return None
         return None
 
-    def set(self, text: str, extraction_type: str, custom_prompt: str, data: dict):
+    def set(self, text: str, extraction_type: str, custom_prompt: str, data: dict, config: dict = None):
         """Saves a new result to the cache."""
-        key = self._generate_key(text, extraction_type, custom_prompt)
+        key = self._generate_key(text, extraction_type, custom_prompt, config)
         cache_file = self.cache_dir / f"{key}.json"
         
         try:
