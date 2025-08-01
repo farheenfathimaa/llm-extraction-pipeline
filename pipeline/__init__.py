@@ -6,7 +6,7 @@ from long research documents using chained LLM calls.
 """
 
 from .document_processor import DocumentProcessor
-from .llm_chains import LLMChainManager, ChainOutputParser
+from .llm_chains import LLMChainManager
 from .evaluation import EvaluationMetrics
 from .utils import ResultsExporter, CacheManager
 
@@ -15,8 +15,7 @@ __author__ = "Your Name"
 
 __all__ = [
     "DocumentProcessor",
-    "LLMChainManager", 
-    "ChainOutputParser",
+    "LLMChainManager",
     "EvaluationMetrics",
     "ResultsExporter",
     "CacheManager"

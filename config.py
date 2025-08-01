@@ -1,5 +1,5 @@
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 @dataclass
@@ -27,7 +27,7 @@ class Config:
     EVALUATION_BATCH_SIZE: int = 10
     
     # File Processing
-    SUPPORTED_FILE_TYPES: List[str] = ['.pdf', '.docx', '.txt', '.md']
+    SUPPORTED_FILE_TYPES: List[str] = field(default_factory=lambda: ['.pdf', '.docx', '.txt', '.md'])
     MAX_FILE_SIZE_MB: int = 10
     TEMP_DIR: str = "temp_uploads"
     
@@ -41,7 +41,7 @@ class Config:
     LOG_FILE: str = "pipeline.log"
     
     # Prompts
-    PROMPTS: Dict[str, str] = {
+    PROMPTS: Dict[str, str] = field(default_factory=lambda: {
         "policy_conclusions": """
         Extract key policy conclusions from the following document. 
         Focus on:
@@ -129,19 +129,19 @@ class Config:
         
         Provide validation feedback and suggestions for improvement.
         """
-    }
+    })
     
     # Evaluation Metrics
-    EVALUATION_METRICS: List[str] = [
+    EVALUATION_METRICS: List[str] = field(default_factory=lambda: [
         "accuracy",
         "completeness",
         "relevance",
         "coherence",
         "processing_speed"
-    ]
+    ])
     
     # Chain Templates
-    CHAIN_TEMPLATES: Dict[str, List[str]] = {
+    CHAIN_TEMPLATES: Dict[str, List[str]] = field(default_factory=lambda: {
         "comprehensive_analysis": [
             "summarization",
             "key_insights",
@@ -163,29 +163,25 @@ class Config:
             "summarization",
             "key_insights"
         ]
-    }
+    })
     
-    @classmethod
-    def get_prompt(cls, prompt_type: str) -> str:
+    def get_prompt(self, prompt_type: str) -> str:
         """Get a prompt template by type"""
-        return cls.PROMPTS.get(prompt_type, cls.PROMPTS["summarization"])
+        return self.PROMPTS.get(prompt_type, self.PROMPTS["summarization"])
     
-    @classmethod
-    def get_chain_template(cls, template_name: str) -> List[str]:
+    def get_chain_template(self, template_name: str) -> List[str]:
         """Get a chain template by name"""
-        return cls.CHAIN_TEMPLATES.get(template_name, cls.CHAIN_TEMPLATES["quick_summary"])
+        return self.CHAIN_TEMPLATES.get(template_name, self.CHAIN_TEMPLATES["quick_summary"])
     
-    @classmethod
-    def validate_api_keys(cls) -> Dict[str, bool]:
+    def validate_api_keys(self) -> Dict[str, bool]:
         """Validate that required API keys are present"""
         return {
-            "openai": bool(cls.OPENAI_API_KEY),
-            "langchain": bool(cls.LANGCHAIN_API_KEY),
-            "anthropic": bool(cls.ANTHROPIC_API_KEY)
+            "openai": bool(self.OPENAI_API_KEY),
+            "langchain": bool(self.LANGCHAIN_API_KEY),
+            "anthropic": bool(self.ANTHROPIC_API_KEY)
         }
     
-    @classmethod
-    def create_temp_directory(cls) -> str:
+    def create_temp_directory(self) -> str:
         """Create temporary directory for file processing"""
-        os.makedirs(cls.TEMP_DIR, exist_ok=True)
-        return cls.TEMP_DIR
+        os.makedirs(self.TEMP_DIR, exist_ok=True)
+        return self.TEMP_DIR
